@@ -18,6 +18,7 @@ def __loan_message_binary(filepath):
 
 
 def send_email(subject, path):
+    ''' 将信息，发送到指定email'''
 
     ## 配置参数
     message = MIMEMultipart('related')       # 不发送内容
@@ -33,7 +34,7 @@ def send_email(subject, path):
 
 
     # 登录邮箱
-    client = smtplib.SMTP_SSL()
+    client = smtplib.SMTP_SSL(email_host)
     client.connect(email_host, '465')
     client.login(delivery, email_code)
 

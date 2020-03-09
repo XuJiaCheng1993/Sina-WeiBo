@@ -8,6 +8,7 @@
 
 import os
 import configparser
+from loggings import set_logger
 
 config_file_path = '../SinaWeiBoCache'
 
@@ -33,3 +34,6 @@ email_host = cf.get('Email', 'host')
 delivery = cf.get('Email', 'delivery')
 receipt = cf.get('Email', 'receipt')
 
+## 日志文件
+logging_file = os.path.join(config_file_path, 'logging', 'logging.txt')
+logger = set_logger(logging_file)

@@ -11,7 +11,7 @@ import pickle
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
-from configs import username, password, path_cookie
+from configs import username, password, path_cookie, logger
 from dateutil.parser import parse
 
 def __address_date(struct_time):
@@ -25,7 +25,7 @@ def __is_update_cookie():
     ## 如果cookie文件不存，则直接返回
     file_name = os.path.join(path_cookie, 'cookie.txt')
     if not os.path.exists(file_name):
-        return False
+        return True
 
     ## 获取cookie文件的更新日期
     atime = __address_date(time.localtime(os.path.getatime(file_name)))
@@ -33,8 +33,8 @@ def __is_update_cookie():
     ## 获取当前时间
     current = __address_date(time.localtime(time.time()))
 
-    ## 如果两者差超过一天，则需要更新cookie
-    if (parse(current) - parse(atime)).seconds >= 3600 * 24:
+    ## 如果两者差超过3小时，则需要更新cookie
+    if (parse(current) - parse(atime)).seconds >= 3600 * 3:
         return True
     else:
         return False
@@ -62,30 +62,33 @@ def __dump_cookie(cookies):
 def __laungh_driver():
     ''' 启动chrome'''
     driver = webdriver.Chrome('./chromedriver', )
-    driver.maximize_window()#将浏览器最大化显示
-    driver.get("https://weibo.com/")  # 打开微博登录页面
-    time.sleep(10)  # 因为加载页面需要时间，所以这里延时10s来确保页面已加载完毕
+    driver.set_window_size(1440, 960)             # 设置浏览器界面
+    driver.get("https://weibo.com/")              # 打开微博登录页面
+    time.sleep(10)                                # 等待页面加载
+    logger.info('[chrome] start successfully...')
     return driver
 
-def get_and_set_cookie():
+def __get_and_set_cookie():
     ''' 启动浏览器，获取并保存cookie'''
     ## 启动chrome
     driver = __laungh_driver()
 
     ## 获取cookie
-    driver.find_element_by_name("username").send_keys(username)  ##输入用户名
-    driver.find_element_by_name("password").send_keys(password)  ##输入密码
-    driver.find_element_by_xpath("//a[@node-type='submitBtn']").click()  ##点击登录按钮
+    driver.find_element_by_name("username").send_keys(username)          #   输入用户名
+    driver.find_element_by_name("password").send_keys(password)          #   输入密码
+    driver.find_element_by_xpath("//a[@node-type='submitBtn']").click()  #   点击登录按钮
+    time.sleep(10) # 等待登录过程结束
+    logger.info('[chrome] relogin ...')
 
-
-    ## 保存cookie
-    time.sleep(2) ## 等待加载
-    cookies = driver.get_cookies()  ##获取cookies
-    __dump_cookie(cookies)
+    ## 获取并保存cookie
+    time.sleep(5)                   # 等待加载
+    cookies = driver.get_cookies()  # 获取cookies
+    __dump_cookie(cookies)          # 保存cookies
+    logger.info('[cookie] save cookie to local...')
     return driver
 
 
-def set_cookie(cookies):
+def __set_cookie(cookies):
     ''' 启动浏览器并设置cookie'''
     driver = __laungh_driver()
 
@@ -93,18 +96,12 @@ def set_cookie(cookies):
     driver.delete_all_cookies()
     for ii in cookies:
         driver.add_cookie(ii)
+    logger.info('[cookie] load local cookies...')
     return driver
 
 
-def spider(url):
-    '''Sina WeiBo爬虫 '''
-    ## 获取cookie
-    if __is_update_cookie():
-        driver = get_and_set_cookie()
-    else:
-        cookie = __load_cookie()
-        driver = set_cookie(cookie)
-
+def __grasp(driver, url):
+    ''' 抓取关键细心'''
     ## 跳转到指定页面
     driver.get(url)
     time.sleep(1)
@@ -137,10 +134,10 @@ def spider(url):
             driver.switch_to.window(window_handle)
         time.sleep(0.5)
 
-    return driver.page_source
+    return driver
 
 
-def item(html):
+def __item(html):
     ''' 提款需要信息'''
     ## 解析html
     soup = BeautifulSoup(html, 'lxml')
@@ -191,3 +188,31 @@ def item(html):
     return messeags
 
 
+def spider(urls, message_file_path):
+    '''Sina WeiBo爬虫 '''
+
+    ## 启动driver, 设置cookie
+    if __is_update_cookie():
+        driver = __get_and_set_cookie()
+    else:
+        cookie = __load_cookie()
+        driver = __set_cookie(cookie)
+
+
+    for url in urls:
+        time.sleep(5)   # 等待加载
+        try:
+            driver = __grasp(driver, url)
+        except:
+            logger.warning(f'[chrome] failed to grasp html from {url} !!')
+
+        try:
+            message = __item(driver.page_source)
+
+            with open(message_file_path, 'a+', encoding='utf-8') as file:
+                file.writelines(message)
+        except:
+            logger.warning(f'[chrome] failed to parse html in {url} !!')
+
+    driver.quit()
+    logger.info('[chrome] close chrome...')

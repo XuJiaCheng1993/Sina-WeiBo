@@ -8,37 +8,33 @@
 
 import os
 import datetime
-from spider import spider, item
-from amails import send_email
-from configs import targets, months, path_message
 import time
+from spider import spider
+from amails import send_email
+from configs import targets, months, path_message, logger
 
 
 def rumMain(now):
+    ''' 主程序'''
+    t_bg = time.perf_counter()
+    logger.info('[WeiBo System] start to run...')
     message_file_path = os.path.join(path_message, f'messeage_{now}.txt')
 
-    for ii in targets:
-        url = f'https://weibo.com/{ii}?is_all=1&stat_date={months}#feedtop'
-        try:
-            html = spider(url)
-            messages = item(html)
-        except:
-            Warning(f'{ii} fetch failed!!!')
-            messages='\n'
-
-        with open(message_file_path, 'a+', encoding='utf-8') as file:
-            file.writelines(messages)
+    spider(urls= [f'https://weibo.com/{ii}?is_all=1&stat_date={months}#feedtop' for ii in targets],
+           message_file_path = message_file_path )
 
     try:
         send_email(f'Weibo{now}', message_file_path)
+        logger.info('[Email] send e-mail successfully...')
     except:
-        Warning(f'{message_file_path} failed to send e-mail!!!')
+        logger.warning(f'[Email] failed to send {message_file_path}!!!')
+    t_ed = time.perf_counter()
+    logger.info(f'[WeiBo System] end to run, escape {t_ed - t_bg:.2f} secs...')
 
 
 weibo_beg = 11 * 3600
 
-
-flag = False
+flag = True
 while True:
     date = datetime.datetime.now()
     current = date.second + 60 * date.minute + 3600 * date.hour
@@ -53,4 +49,4 @@ while True:
         time.sleep(1)
 
 
-    print(current)
+    print(date)
